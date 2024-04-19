@@ -261,7 +261,7 @@ def main():
     
     # plot_total_energy_vs_hops_allnodes(data)
     # plot_energy_per_hop(data)
-    # plot_energy_vs_hops_legend_bytes_types_windows(data)
+    plot_energy_vs_hops_legend_bytes_types_windows(data)
     # plot_energy_vs_nodes_legend_type_bytes_windows(data)
 
     plt.show()
