@@ -1,0 +1,14 @@
+Assumptions:
+
+* Same client application for all the methods: 2 bytes of data transmitted to the server every 10 seconds.
+* INT and Piggybacking: Telemetry content is only appended if the destination is the root/server node.
+* The root node is also the CoAP server.
+* Active monitoring: Monitoring data is sent as application traffic every 7 seconds from each client node to the server.
+* Steady state: Data acquisition starts when the last node joins the network and then 20 minutes from there.
+* Only the energy consumption of the radio is considered.
+* Same TSCH/RPL parameters for all methods.
+
+*   - Node number 3 is always the last node.
+    - Node number 1 is alwyas the root/server
+    -  1 <-> 2 <-> 4 <-> ... <-> 3
+

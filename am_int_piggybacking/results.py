@@ -305,6 +305,78 @@ def plot_bytes_per_hop(data_structure):
         plt.grid()
         plt.show(block = False)
 
+def plot_average_energy_per_byte_vs_hops(data_structure):
+    plot_dict = {}
+
+    for file_key, file_data in data_structure.items():
+        plot_id = str(file_data['hops']) + '_' + str(file_data['bytes'])
+        plot_dict[plot_id] = plot_dict.get(plot_id, {'hops': file_data['hops'], 'bytes': file_data['bytes']})
+
+        file_type = str(file_data['type'])
+        plot_dict[plot_id]['types'] = plot_dict[plot_id].get('types', {})
+        plot_dict[plot_id]['types'][file_type] = plot_dict[plot_id]['types'].get(file_type, 0)
+        plot_dict[plot_id]['types'][file_type]= file_data['total_energy_consumption'] / file_data['telemetry_bytes_transmited']
+    
+    for plot_key, plot_data in plot_dict.items():
+        plt.figure()
+        plt.title(str(plot_data['hops'] + 2) + ' nodes and ' + str(plot_data['bytes']) + ' bytes of telemetry')
+        x_values = list(plot_data['types'].keys())
+        y_values = []
+        for types_key, types_data in plot_data['types'].items():
+            y_values.append(types_data)
+        
+        for i in range(len(x_values)):
+            x_values[i] = LABEL_DICT[x_values[i]]
+        plt.xlabel('Method')
+        plt.ylabel('mJ / Byte of telemetry transmitted')
+        plt.bar(x_values, y_values, color ='maroon', width = 0.4)
+        plt.show(block = False)
+
+def plot_byte_cost_vs_nodes_legend_type_bytes_windows(data_structure):
+    plot_dict = {}
+
+    for file_key, file_data in data_structure.items():
+        plot_id = str(file_data['bytes'])
+        plot_dict[plot_id] = plot_dict.get(plot_id, {})
+        plot_dict[plot_id]['number_nodes_unique'] = plot_dict[plot_id].get('number_nodes_unique', set())
+        plot_dict[plot_id]['number_nodes_ordered'] = plot_dict[plot_id].get('number_nodes_ordered', [])
+
+        if str(file_data['number_nodes']) not in plot_dict[plot_id]['number_nodes_unique']:
+            plot_dict[plot_id]['number_nodes_unique'].add(str(file_data['number_nodes']))
+            plot_dict[plot_id]['number_nodes_ordered'].append(str(file_data['number_nodes']) + ' Nodes')
+
+        plot_dict[plot_id]['measurements'] = plot_dict[plot_id].get('measurements', {})
+
+        type = str(file_data['type'])
+        plot_dict[plot_id]['measurements'][type] = plot_dict[plot_id]['measurements'].get(type, [])
+        plot_dict[plot_id]['measurements'][type].append(file_data['total_energy_consumption'] / file_data['telemetry_bytes_transmited'])
+
+    
+    for plot_key, plot_data in plot_dict.items():  
+        nodes = list(plot_data['number_nodes_ordered'])
+        x = np.arange(len(nodes))  # the label locations
+        width = 0.25  # the width of the bars
+        multiplier = 0
+
+        averages = {key: sum(values) / len(values) for key, values in plot_data['measurements'].items()}
+        sorted_keys = sorted(plot_data['measurements'].keys(), key=lambda x: averages[x])
+        sorted_measurements = {key: plot_data['measurements'][key] for key in sorted_keys}
+
+        fig, ax = plt.subplots(layout = 'constrained')
+        for attr, measurement in sorted_measurements.items():
+            offset = width * multiplier
+            rects = ax.bar(x + offset, measurement, width, label=LABEL_DICT[attr])
+            ax.bar_label(rects, padding=2, fmt='{:.2f}')
+            multiplier += 1
+
+        
+        ax.set_ylabel('Byte cost (mJ/byte)')
+        ax.set_title('Byte cost per method')
+        ax.set_xticks(x + width, plot_data['number_nodes_ordered'])
+        ax.legend(loc='upper left', ncols=3)
+        ax.set_ylim(0, 1.6)
+
+        plt.show(block = False)
 
 def main():
     FOLDER_PATH = os.path.join(SELF_PATH, "datafiles")
@@ -315,10 +387,12 @@ def main():
         file_cnt += 1
     
     # plot_total_energy_vs_hops_allnodes(data)
-    plot_energy_per_hop(data)
-    # plot_energy_vs_hops_legend_bytes_types_windows(data)
-    # plot_energy_vs_nodes_legend_type_bytes_windows(data)
+    # plot_energy_per_hop(data)
+    # plot_energy_vs_hops_legend_bytes_types_windows(data)  
+    plot_energy_vs_nodes_legend_type_bytes_windows(data)
     plot_bytes_per_hop(data)
+    # plot_average_energy_per_byte_vs_hops(data)
+    plot_byte_cost_vs_nodes_legend_type_bytes_windows(data)
     plt.show()
 
 
