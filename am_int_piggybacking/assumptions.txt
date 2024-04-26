@@ -1,4 +1,4 @@
-Assumptions:
+Assumptions (datafiles):
 
 * Same client application for all the methods: 2 bytes of data transmitted to the server every 10 seconds.
 * INT and Piggybacking: Telemetry content is only appended if the destination is the root/server node.
@@ -12,3 +12,9 @@ Assumptions:
     - Node number 1 is alwyas the root/server
     -  1 <-> 2 <-> 4 <-> ... <-> 3
 
+Assumptions (demanding)
+
+* Application payload size varies between 28, 32, 36, 40, 44 randomly
+* Application frequency is 10 seconds
+* Monitoring frequency is 15 seconds
+* Steady state: Data acquisition starts when the last node joins the network and then 20 minutes from there.
