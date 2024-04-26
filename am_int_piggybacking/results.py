@@ -23,7 +23,16 @@ LABEL_DICT = {
 }
 
 SELF_PATH = os.path.dirname(os.path.abspath(__file__))
+DIAGRAMS_PATH = os.path.join(os.path.dirname(SELF_PATH), 'network')
 
+SUBPLOT_LEFT = 0.1
+SUBPLOT_BOTTOM = 0.1
+SUBPLOT_WIDTH = 0.75
+SUBPLOT_HEIGHT = 0.8
+
+SUBPLOT_IMAGE_POSX = 810
+SUBPLOT_IMAGE_POSY = 70
+SUBPLOT_IMAGE_POSY_MULT = 60
 
 def time_to_seconds(time_str):
     minutes, seconds = map(float, time_str.split(':'))
@@ -123,6 +132,10 @@ def file_parser(folder_path, filename):
     bytes_per_node[1] = 0
     data_object['bytes_per_node'] = bytes_per_node
 
+    for i in range(1, data_object['number_nodes']):
+        if i not in list(data_object['bytes_per_node'].keys()):
+            data_object['bytes_per_node'][i] = 0
+
     for node in nodes:
         
         total_avg_current_mA = 0
@@ -183,6 +196,7 @@ def plot_energy_per_hop(data_structure):
     for file_key, file_data in data_structure.items():
         plot_id = str(file_data['hops']) + '_' + str(file_data['bytes'])
         plot_dict[plot_id] = plot_dict.get(plot_id, {'hops': file_data['hops'], 'bytes': file_data['bytes']})
+        plot_dict[plot_id]['nodes'] = file_data['number_nodes']
         sort_vector = []
 
         for i in range(plot_dict[plot_id]['hops'] + 1):
@@ -199,21 +213,26 @@ def plot_energy_per_hop(data_structure):
         plot_dict[plot_id]['types'][file_type] = {k : plot_dict[plot_id]['types'][file_type][k] for k in sorted(plot_dict[plot_id]['types'][file_type], key = lambda k: sort_vector.index(k))}
 
     for plot_key, plot_data in plot_dict.items():
-        plt.figure()
+        fig = plt.figure(figsize=(7.4, 4.8))
+
+        ax = fig.add_subplot(111, position=[SUBPLOT_LEFT, SUBPLOT_BOTTOM, SUBPLOT_WIDTH, SUBPLOT_HEIGHT])
         plt.title(str(plot_data['hops'] + 2) + ' nodes and ' + str(plot_data['bytes']) + ' bytes of telemetry')
+        
         for type_key, type_data in plot_data['types'].items():
             y_values = []
             x_labels = []
             for node_key, node_data in type_data.items():
                 y_values.append(node_data['energy_consumption'])
                 x_labels.append(str(node_key))
-            plt.plot(x_labels, y_values, label = LABEL_DICT[type_key])
-            plt.xticks(x_labels)
-            plt.ylabel('Total energy consumption in mJ')
-            plt.xlabel('Node #')
-            plt.legend()
-            
-        plt.grid()
+            ax.plot(x_labels, y_values, label = LABEL_DICT[type_key])
+            ax.set_xticks(x_labels)
+            ax.set_ylabel('Total energy consumption in mJ')
+            ax.set_xlabel('Node #')
+            ax.legend()
+        
+        img = plt.imread(os.path.join(DIAGRAMS_PATH, str(plot_data['nodes']) + 'nodes.png'))
+        fig.figimage(img, SUBPLOT_IMAGE_POSX, SUBPLOT_IMAGE_POSY + SUBPLOT_IMAGE_POSY_MULT*(7 - plot_data['nodes']))
+        ax.grid()
         plt.show(block = False)
 
 def plot_energy_vs_hops_legend_bytes_types_windows(data_structure):
@@ -272,6 +291,7 @@ def plot_bytes_per_hop(data_structure):
     for file_key, file_data in data_structure.items():
         plot_id = str(file_data['hops']) + '_' + str(file_data['bytes'])
         plot_dict[plot_id] = plot_dict.get(plot_id, {'hops': file_data['hops'], 'bytes': file_data['bytes']})
+        plot_dict[plot_id]['nodes'] = file_data['number_nodes']
         sort_vector = []
 
         for i in range(plot_dict[plot_id]['hops'] + 1):
@@ -288,7 +308,10 @@ def plot_bytes_per_hop(data_structure):
         plot_dict[plot_id]['types'][file_type] = {k : plot_dict[plot_id]['types'][file_type][k] for k in sorted(plot_dict[plot_id]['types'][file_type], key = lambda k: sort_vector.index(k))}
     
     for plot_key, plot_data in plot_dict.items():
-        plt.figure()
+        fig = plt.figure(figsize=(7.4, 4.8))
+
+        ax = fig.add_subplot(111, position=[SUBPLOT_LEFT, SUBPLOT_BOTTOM, SUBPLOT_WIDTH, SUBPLOT_HEIGHT])
+
         plt.title(str(plot_data['hops'] + 2) + ' nodes and ' + str(plot_data['bytes']) + ' bytes of telemetry')
         for type_key, type_data in plot_data['types'].items():
             y_values = []
@@ -296,13 +319,15 @@ def plot_bytes_per_hop(data_structure):
             for node_key, node_data in type_data.items():
                 y_values.append(node_data)
                 x_labels.append(str(node_key))
-            plt.plot(x_labels, y_values, label = LABEL_DICT[type_key])
-            plt.xticks(x_labels)
-            plt.ylabel('Total bytes of telemetry appended')
-            plt.xlabel('Node #')
-            plt.legend()
-            
-        plt.grid()
+            ax.plot(x_labels, y_values, label = LABEL_DICT[type_key])
+            ax.set_xticks(x_labels)
+            ax.set_ylabel('Total bytes of telemetry appended')
+            ax.set_xlabel('Node #')
+            ax.legend()
+        
+        img = plt.imread(os.path.join(DIAGRAMS_PATH, str(plot_data['nodes']) + 'nodes.png'))
+        fig.figimage(img, SUBPLOT_IMAGE_POSX, SUBPLOT_IMAGE_POSY + SUBPLOT_IMAGE_POSY_MULT*(7 - plot_data['nodes']))
+        ax.grid()
         plt.show(block = False)
 
 def plot_average_energy_per_byte_vs_hops(data_structure):
@@ -387,12 +412,12 @@ def main():
         file_cnt += 1
     
     # plot_total_energy_vs_hops_allnodes(data)
-    # plot_energy_per_hop(data)
+    plot_energy_per_hop(data)
     # plot_energy_vs_hops_legend_bytes_types_windows(data)  
-    plot_energy_vs_nodes_legend_type_bytes_windows(data)
-    plot_bytes_per_hop(data)
+    # plot_energy_vs_nodes_legend_type_bytes_windows(data)
+    # plot_bytes_per_hop(data)
     # plot_average_energy_per_byte_vs_hops(data)
-    plot_byte_cost_vs_nodes_legend_type_bytes_windows(data)
+    # plot_byte_cost_vs_nodes_legend_type_bytes_windows(data)
     plt.show()
 
 
