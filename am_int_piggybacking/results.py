@@ -404,7 +404,7 @@ def plot_byte_cost_vs_nodes_legend_type_bytes_windows(data_structure):
         plt.show(block = False)
 
 def main():
-    FOLDER_PATH = os.path.join(SELF_PATH, "datafiles")
+    FOLDER_PATH = os.path.join(SELF_PATH, "datafiles_demanding")
     file_cnt = 0
     data = {}
     for filename in os.listdir(FOLDER_PATH):
@@ -415,7 +415,7 @@ def main():
     plot_energy_per_hop(data)
     # plot_energy_vs_hops_legend_bytes_types_windows(data)  
     # plot_energy_vs_nodes_legend_type_bytes_windows(data)
-    # plot_bytes_per_hop(data)
+    plot_bytes_per_hop(data)
     # plot_average_energy_per_byte_vs_hops(data)
     # plot_byte_cost_vs_nodes_legend_type_bytes_windows(data)
     plt.show()
