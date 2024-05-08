@@ -14,12 +14,13 @@ STATES = list(CURRENT_MA.keys())
 
 RTIMER_ARCH_SECOND = 1000000 # Cooja RTIMER_ARCH_SECOND
 VOLTAGE = 3.0 # assume 3 volt batteries
-EXECUTION_TIME_IN_SECONDS = 1200
+EXECUTION_TIME_IN_SECONDS = 40 * 60 # 20 * 60
 
 LABEL_DICT = {
     "am": "Active Monitoring",
-    "int": "In-Band Network",
-    "pb": "Piggybacking"
+    "int": "INT Opportunistic",
+    "pb": "Piggybacking",
+    "intprob": "INT Probabilistic"
 }
 
 SELF_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -30,9 +31,9 @@ SUBPLOT_BOTTOM = 0.1
 SUBPLOT_WIDTH = 0.75
 SUBPLOT_HEIGHT = 0.8
 
-SUBPLOT_IMAGE_POSX = 810
-SUBPLOT_IMAGE_POSY = 70
-SUBPLOT_IMAGE_POSY_MULT = 60
+SUBPLOT_IMAGE_POSX = 625
+SUBPLOT_IMAGE_POSY = 40
+SUBPLOT_IMAGE_POSY_MULT = 30
 
 def time_to_seconds(time_str):
     minutes, seconds = map(float, time_str.split(':'))
@@ -43,7 +44,9 @@ def file_parser(folder_path, filename):
     node_ticks = {}
     node_total_ticks = {}
     bytes_per_node = {}
+    number_pkts_tm_appended = {}
     total_telemetry_bytes = 0
+    pkts_transmitted = 0
     t_zero = -1
     t_sim = 0
 
@@ -61,6 +64,9 @@ def file_parser(folder_path, filename):
                 except:
                     continue
             else:
+                if t_sim >= EXECUTION_TIME_IN_SECONDS:
+                    break
+
                 if re.search(r'ID:1(.*)EXPERIMENT: Consumed', line):
                     pattern = re.escape("Consumed ") + r'(.*?)' + re.escape(" Bytes")
                     match = re.search(pattern, line)
@@ -74,10 +80,18 @@ def file_parser(folder_path, filename):
                     bytes_per_node[source_node] = bytes_per_node.get(source_node, 0)
                     bytes_per_node[source_node] += tm_bytes
 
+                if re.search(r'--- Sending > &', line):
+                    pkts_transmitted += 1
+                    continue
+                
+                if re.search(r'Add new entry', line):
+                    fields = line.split()
+                    node_field = fields[1].split(':')
+                    node = int(node_field[1])
+                    number_pkts_tm_appended[node] = number_pkts_tm_appended.get(node, 0)
+                    number_pkts_tm_appended[node] += 1
+                    continue
 
-
-                if t_sim > EXECUTION_TIME_IN_SECONDS:
-                    break
 
                 if "INFO: Energest" not in line:
                     continue
@@ -131,10 +145,16 @@ def file_parser(folder_path, filename):
     data_object['total_energy_consumption'] = 0
     bytes_per_node[1] = 0
     data_object['bytes_per_node'] = bytes_per_node
+    data_object['number_packets'] = pkts_transmitted
+    data_object['pkts_tm_appended_per_node'] = number_pkts_tm_appended
 
-    for i in range(1, data_object['number_nodes']):
+    for i in range(1, data_object['number_nodes'] + 1):
         if i not in list(data_object['bytes_per_node'].keys()):
             data_object['bytes_per_node'][i] = 0
+        if i not in list(data_object['pkts_tm_appended_per_node'].keys()):
+            data_object['pkts_tm_appended_per_node'][i] = 0
+    
+
 
     for node in nodes:
         
@@ -403,8 +423,52 @@ def plot_byte_cost_vs_nodes_legend_type_bytes_windows(data_structure):
 
         plt.show(block = False)
 
+def plot_insertion_ratio(data_structure):
+    plot_dict = {}
+
+    for file_key, file_data in data_structure.items():
+        file_type = str(file_data['type'])
+        plot_id = str(file_data['hops']) + '_' + str(file_data['bytes']) + '_' + file_type
+        plot_dict[plot_id] = plot_dict.get(plot_id, {'hops': file_data['hops'], 'bytes': file_data['bytes']})
+        plot_dict[plot_id]['nodes'] = file_data['number_nodes']
+        plot_dict[plot_id]['type'] = file_type
+        plot_dict[plot_id]['number_pkts'] = file_data['number_packets']
+        sort_vector = []
+
+        for i in range(plot_dict[plot_id]['hops'] + 1):
+            if i >= 2:
+                sort_vector.append(i + 2)
+            else:
+                sort_vector.append(i + 1)
+
+        sort_vector.append(3)
+
+        plot_dict[plot_id]['pkts_tm_appended_per_node'] = file_data['pkts_tm_appended_per_node']
+        plot_dict[plot_id]['pkts_tm_appended_per_node'] = {k : plot_dict[plot_id]['pkts_tm_appended_per_node'][k] for k in sorted(plot_dict[plot_id]['pkts_tm_appended_per_node'], key = lambda k: sort_vector.index(k))}
+    
+    for plot_key, plot_data in plot_dict.items():
+        fig = plt.figure(figsize=(7.4, 4.8))
+
+        ax = fig.add_subplot(111, position=[SUBPLOT_LEFT, SUBPLOT_BOTTOM, SUBPLOT_WIDTH, SUBPLOT_HEIGHT])
+
+        plt.title(LABEL_DICT[plot_data['type']] + ': ' + str(plot_data['hops'] + 2) + ' nodes and ' + str(plot_data['bytes']) + ' bytes of telemetry')
+        x_labels = [str(x) for x in list(plot_data['pkts_tm_appended_per_node'].keys())]
+        y_values = [(x / plot_data['number_pkts'])*100 for x in list(plot_data['pkts_tm_appended_per_node'].values())]
+        y_values[0] = 100
+        rects = ax.bar(x_labels, y_values)
+        ax.set_xticks(x_labels)
+        ax.set_ylabel('Insertion ratio (%)')
+        ax.set_xlabel('Node #')
+        ax.bar_label(rects, padding=2, fmt='{:.2f} %')
+        # ax.legend()
+        
+        img = plt.imread(os.path.join(DIAGRAMS_PATH, str(plot_data['nodes']) + 'nodes.png'))
+        fig.figimage(img, SUBPLOT_IMAGE_POSX, SUBPLOT_IMAGE_POSY + SUBPLOT_IMAGE_POSY_MULT*(7 - plot_data['nodes']))
+        # ax.grid()
+        plt.show(block = False)
+
 def main():
-    FOLDER_PATH = os.path.join(SELF_PATH, "datafiles_demanding")
+    FOLDER_PATH = os.path.join(SELF_PATH, "ins_ratio")
     file_cnt = 0
     data = {}
     for filename in os.listdir(FOLDER_PATH):
@@ -412,12 +476,13 @@ def main():
         file_cnt += 1
     
     # plot_total_energy_vs_hops_allnodes(data)
-    plot_energy_per_hop(data)
+    # plot_energy_per_hop(data)
     # plot_energy_vs_hops_legend_bytes_types_windows(data)  
     # plot_energy_vs_nodes_legend_type_bytes_windows(data)
-    plot_bytes_per_hop(data)
+    # plot_bytes_per_hop(data)
     # plot_average_energy_per_byte_vs_hops(data)
     # plot_byte_cost_vs_nodes_legend_type_bytes_windows(data)
+    plot_insertion_ratio(data)
     plt.show()
 
 
