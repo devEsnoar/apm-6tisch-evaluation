@@ -14,7 +14,7 @@ Assumptions (datafiles):
 
 Assumptions (demanding)
 
-* Application payload size varies between 28, 32, 36, 40, 44 randomly
+* Application payload size varies between 28, 32, 36, 40  randomly
 * Application frequency is 10 seconds
 * Monitoring frequency is 15 seconds
 * Steady state: Data acquisition starts when the last node joins the network and then 20 minutes from there.
@@ -23,3 +23,7 @@ Assumptions (ins_ratio)
 * Only node 3 generates app traffic
 * Compensation for 6LoWPAN header compression/decompression applied
 * Steady state: Data acquisition starts when the last node joins the network and then 40 minutes from there.
+
+v5
+* Parse for 30 minutes
+

@@ -14,13 +14,18 @@ STATES = list(CURRENT_MA.keys())
 
 RTIMER_ARCH_SECOND = 1000000 # Cooja RTIMER_ARCH_SECOND
 VOLTAGE = 3.0 # assume 3 volt batteries
-EXECUTION_TIME_IN_SECONDS = 40 * 60 # 20 * 60
+EXECUTION_TIME_IN_SECONDS = 20 * 60 # v3 and v4: 20 * 60 || ins_ratio: 40 * 60  || v5: 30 || v5 tx and rx: 20
 
 LABEL_DICT = {
     "am": "Active Monitoring",
     "int": "INT Opportunistic",
     "pb": "Piggybacking",
-    "intprob": "INT Probabilistic"
+    "intprob": "INT Probabilistic",
+    "aminto": "AM + Int O",
+    "tx_total_bytes": "TX",
+    "rx_total_bytes": "RX",
+    "tx_total_ops": "TX",
+    "rx_total_ops": "RX"
 }
 
 SELF_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -31,7 +36,7 @@ SUBPLOT_BOTTOM = 0.1
 SUBPLOT_WIDTH = 0.75
 SUBPLOT_HEIGHT = 0.8
 
-SUBPLOT_IMAGE_POSX = 625
+SUBPLOT_IMAGE_POSX = 800
 SUBPLOT_IMAGE_POSY = 40
 SUBPLOT_IMAGE_POSY_MULT = 30
 
@@ -47,6 +52,10 @@ def file_parser(folder_path, filename):
     number_pkts_tm_appended = {}
     total_telemetry_bytes = 0
     pkts_transmitted = 0
+    tx_ops_per_node = {}
+    total_tx_bytes_per_node = {}
+    rx_ops_per_node = {}
+    total_rx_bytes_per_node = {}
     t_zero = -1
     t_sim = 0
 
@@ -83,6 +92,28 @@ def file_parser(folder_path, filename):
                 if re.search(r'--- Sending > &', line):
                     pkts_transmitted += 1
                     continue
+
+                if re.search(r'Especial: tx op', line):
+                    pattern = re.escape("tx op, ") + r'(.*?)' + re.escape(" bytes\n")
+                    match = re.search(pattern, line)
+                    fields = line.split()
+                    node_field = fields[1].split(':')
+                    node = int(node_field[1])
+                    tx_ops_per_node[node] = tx_ops_per_node.get(node, 0)
+                    tx_ops_per_node[node] += 1
+                    total_tx_bytes_per_node[node] = total_tx_bytes_per_node.get(node, 0)
+                    total_tx_bytes_per_node[node] += int(match.group(1))
+
+                if re.search(r'Especial: rx op', line):
+                    pattern = re.escape("rx op, ") + r'(.*?)' + re.escape(" bytes\n")
+                    match = re.search(pattern, line)
+                    fields = line.split()
+                    node_field = fields[1].split(':')
+                    node = int(node_field[1])
+                    rx_ops_per_node[node] = rx_ops_per_node.get(node, 0)
+                    rx_ops_per_node[node] += 1
+                    total_rx_bytes_per_node[node] = total_rx_bytes_per_node.get(node, 0)
+                    total_rx_bytes_per_node[node] += int(match.group(1))
                 
                 if re.search(r'Add new entry', line):
                     fields = line.split()
@@ -145,6 +176,10 @@ def file_parser(folder_path, filename):
     data_object['total_energy_consumption'] = 0
     bytes_per_node[1] = 0
     data_object['bytes_per_node'] = bytes_per_node
+    data_object['total_rx_bytes_per_node'] = total_rx_bytes_per_node
+    data_object['total_tx_bytes_per_node'] = total_tx_bytes_per_node
+    data_object['tx_ops_per_node'] = tx_ops_per_node
+    data_object['rx_ops_per_node'] = rx_ops_per_node
     data_object['number_packets'] = pkts_transmitted
     data_object['pkts_tm_appended_per_node'] = number_pkts_tm_appended
 
@@ -153,6 +188,15 @@ def file_parser(folder_path, filename):
             data_object['bytes_per_node'][i] = 0
         if i not in list(data_object['pkts_tm_appended_per_node'].keys()):
             data_object['pkts_tm_appended_per_node'][i] = 0
+        if i not in list(data_object['total_rx_bytes_per_node'].keys()):
+            data_object['total_rx_bytes_per_node'][i] = 0
+        if i not in list(data_object['total_tx_bytes_per_node'].keys()):
+            data_object['total_tx_bytes_per_node'][i] = 0
+        if i not in list(data_object['tx_ops_per_node'].keys()):
+            data_object['tx_ops_per_node'][i] = 0
+        if i not in list(data_object['rx_ops_per_node'].keys()):
+            data_object['rx_ops_per_node'][i] = 0
+
     
 
 
@@ -306,7 +350,7 @@ def plot_energy_vs_nodes_legend_type_bytes_windows(data_structure):
             plt.legend()
             plt.show(block = False)
 
-def plot_bytes_per_hop(data_structure):
+def plot_bytes_per_hop(data_structure, user_req, average):
     plot_dict = {}
     for file_key, file_data in data_structure.items():
         plot_id = str(file_data['hops']) + '_' + str(file_data['bytes'])
@@ -333,21 +377,34 @@ def plot_bytes_per_hop(data_structure):
         ax = fig.add_subplot(111, position=[SUBPLOT_LEFT, SUBPLOT_BOTTOM, SUBPLOT_WIDTH, SUBPLOT_HEIGHT])
 
         plt.title(str(plot_data['hops'] + 2) + ' nodes and ' + str(plot_data['bytes']) + ' bytes of telemetry')
+        colors = ['r', 'b', 'g', 'y', 'c']
+        cnt = 0
         for type_key, type_data in plot_data['types'].items():
             y_values = []
             x_labels = []
             for node_key, node_data in type_data.items():
-                y_values.append(node_data)
+                # / 40 to calculate bytes per min (average)
+                if(average):
+                    y_values.append(node_data / (EXECUTION_TIME_IN_SECONDS / 60))
+                else:
+                     y_values.append(node_data)
+
                 x_labels.append(str(node_key))
-            ax.plot(x_labels, y_values, label = LABEL_DICT[type_key])
+            ax.plot(x_labels, y_values, marker = '.', color = colors[cnt], label = LABEL_DICT[type_key])
+            ax.plot(x_labels, y_values, color = colors[cnt])
             ax.set_xticks(x_labels)
-            ax.set_ylabel('Total bytes of telemetry appended')
+            if(average):
+                ax.set_ylabel('Total bytes of telemetry appended')
+            else:
+                ax.set_ylabel('Bytes of telemetry appended per minute (average)')
             ax.set_xlabel('Node #')
             ax.legend()
+            cnt += 1 
         
         img = plt.imread(os.path.join(DIAGRAMS_PATH, str(plot_data['nodes']) + 'nodes.png'))
         fig.figimage(img, SUBPLOT_IMAGE_POSX, SUBPLOT_IMAGE_POSY + SUBPLOT_IMAGE_POSY_MULT*(7 - plot_data['nodes']))
         ax.grid()
+        plt.axhspan(0, user_req, color="red", alpha=0.15, lw=0)
         plt.show(block = False)
 
 def plot_average_energy_per_byte_vs_hops(data_structure):
@@ -374,7 +431,8 @@ def plot_average_energy_per_byte_vs_hops(data_structure):
             x_values[i] = LABEL_DICT[x_values[i]]
         plt.xlabel('Method')
         plt.ylabel('mJ / Byte of telemetry transmitted')
-        plt.bar(x_values, y_values, color ='maroon', width = 0.4)
+        rects = plt.bar(x_values, y_values, color ='maroon', width = 0.4)
+        plt.bar_label(rects, padding=2, fmt='{:.3f}')
         plt.show(block = False)
 
 def plot_byte_cost_vs_nodes_legend_type_bytes_windows(data_structure):
@@ -416,10 +474,10 @@ def plot_byte_cost_vs_nodes_legend_type_bytes_windows(data_structure):
 
         
         ax.set_ylabel('Byte cost (mJ/byte)')
-        ax.set_title('Byte cost per method')
+        ax.set_title('Byte cost per method: ' + plot_key + ' bytes of telemetry')
         ax.set_xticks(x + width, plot_data['number_nodes_ordered'])
         ax.legend(loc='upper left', ncols=3)
-        ax.set_ylim(0, 1.6)
+        ax.set_ylim(0, 2)
 
         plt.show(block = False)
 
@@ -467,8 +525,82 @@ def plot_insertion_ratio(data_structure):
         # ax.grid()
         plt.show(block = False)
 
+def plot_tx_rx_hop(data_structure, total):
+    plot_dict = {}
+    for file_key, file_data in data_structure.items():
+        plot_id = str(file_data['hops']) + '_' + str(file_data['bytes'])
+        plot_dict[plot_id] = plot_dict.get(plot_id, {'hops': file_data['hops'], 'bytes': file_data['bytes']})
+        plot_dict[plot_id]['nodes'] = file_data['number_nodes']
+        sort_vector = []
+
+        for i in range(plot_dict[plot_id]['hops'] + 1):
+            if i >= 2:
+                sort_vector.append(i + 2)
+            else:
+                sort_vector.append(i + 1)
+
+        sort_vector.append(3)
+
+        file_type = str(file_data['type'])
+        plot_dict[plot_id]['types'] = plot_dict[plot_id].get('types', {})
+        plot_dict[plot_id]['types'][file_type] = plot_dict[plot_id]['types'].get(file_type, {})
+
+        if total:
+            tx_key = 'tx_total_bytes'
+            rx_key = 'rx_total_bytes'
+            tx_data_key = 'total_tx_bytes_per_node'
+            rx_data_key = 'total_rx_bytes_per_node'
+            title = 'Total bytes processed per hop'
+            ylim = 350
+            pltfmt = '{:.2f}'
+            ylabel = "Bytes (KB)"
+        else:
+            tx_key = 'tx_total_ops'
+            rx_key = 'rx_total_ops'
+            tx_data_key = 'tx_ops_per_node'
+            rx_data_key = 'rx_ops_per_node'
+            title = 'Total operations per hop'
+            pltfmt = '{:}'
+            ylim = 5000
+            ylabel = "# of operations"
+        
+        plot_dict[plot_id]['types'][file_type][tx_key] = plot_dict[plot_id]['types'][file_type].get(tx_key, file_data[tx_data_key])
+        plot_dict[plot_id]['types'][file_type][tx_key] = {k : plot_dict[plot_id]['types'][file_type][tx_key][k] for k in sorted(plot_dict[plot_id]['types'][file_type][tx_key], key = lambda k: sort_vector.index(k))}
+
+        plot_dict[plot_id]['types'][file_type][rx_key] = plot_dict[plot_id]['types'][file_type].get(rx_key, file_data[rx_data_key])
+        plot_dict[plot_id]['types'][file_type][rx_key] = {k : plot_dict[plot_id]['types'][file_type][rx_key][k] for k in sorted(plot_dict[plot_id]['types'][file_type][rx_key], key = lambda k: sort_vector.index(k))}
+            
+    
+    for plot_key, plot_data in plot_dict.items():  
+        for type_key, type_data in plot_data['types'].items():
+            nodes = list(type_data[tx_key].keys())
+            x = np.arange(len(nodes))  # the label locations
+            width = 0.7  # the width of the bars
+            multiplier = 0
+            
+            if total:
+                type_data[tx_key] = {key: values / 1000 for key, values in type_data[tx_key].items()}
+                type_data[rx_key] = {key: values / 1000 for key, values in type_data[rx_key].items()}
+
+            fig, ax = plt.subplots(layout = 'constrained')
+            bottom = np.zeros(len(nodes))
+            for attr, measurement in type_data.items():
+                offset = width * multiplier
+                rects = ax.bar(x, list(measurement.values()), width, label=LABEL_DICT[attr], bottom = bottom)
+                ax.bar_label(rects, padding=2, fmt=pltfmt, label_type='center')
+                bottom += list(measurement.values())
+
+            
+            ax.set_ylabel(ylabel)
+            ax.set_title(title)
+            ax.set_xticks(x, nodes)
+            ax.legend(loc='upper left', ncols=3)
+            ax.set_ylim(0, ylim)
+
+            plt.show(block = False)
+
 def main():
-    FOLDER_PATH = os.path.join(SELF_PATH, "ins_ratio")
+    FOLDER_PATH = os.path.join(SELF_PATH, "datafiles_v5")
     file_cnt = 0
     data = {}
     for filename in os.listdir(FOLDER_PATH):
@@ -479,10 +611,13 @@ def main():
     # plot_energy_per_hop(data)
     # plot_energy_vs_hops_legend_bytes_types_windows(data)  
     # plot_energy_vs_nodes_legend_type_bytes_windows(data)
-    # plot_bytes_per_hop(data)
+    # plot_bytes_per_hop(data, 0, False)
     # plot_average_energy_per_byte_vs_hops(data)
     # plot_byte_cost_vs_nodes_legend_type_bytes_windows(data)
-    plot_insertion_ratio(data)
+    # plot_insertion_ratio(data)
+    plot_tx_rx_hop(data, False)
+    plot_tx_rx_hop(data, True)
+
     plt.show()
 
 
