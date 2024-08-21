@@ -14,7 +14,7 @@ STATES = list(CURRENT_MA.keys())
 
 RTIMER_ARCH_SECOND = 1000000 # Cooja RTIMER_ARCH_SECOND
 VOLTAGE = 3.0 # assume 3 volt batteries
-EXECUTION_TIME_IN_SECONDS = 20 * 60 # v3 and v4: 20 * 60 || ins_ratio: 40 * 60  || v5: 30 || v5 tx and rx: 20
+EXECUTION_TIME_IN_SECONDS = 20 * 60 # v3 and v4: 20 * 60 || ins_ratio: 40 * 60  || v5: 30 || v5 tx and rx: 20 || circular special: 20
 
 LABEL_DICT = {
     "am": "Active Monitoring",
@@ -25,7 +25,8 @@ LABEL_DICT = {
     "tx_total_bytes": "TX",
     "rx_total_bytes": "RX",
     "tx_total_ops": "TX",
-    "rx_total_ops": "RX"
+    "rx_total_ops": "RX",
+    "none": "No approach"
 }
 
 SELF_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -293,9 +294,10 @@ def plot_energy_per_hop(data_structure):
             ax.set_ylabel('Total energy consumption in mJ')
             ax.set_xlabel('Node #')
             ax.legend()
+            ax.set_ylim(0,1500)
         
-        img = plt.imread(os.path.join(DIAGRAMS_PATH, str(plot_data['nodes']) + 'nodes.png'))
-        fig.figimage(img, SUBPLOT_IMAGE_POSX, SUBPLOT_IMAGE_POSY + SUBPLOT_IMAGE_POSY_MULT*(7 - plot_data['nodes']))
+        # img = plt.imread(os.path.join(DIAGRAMS_PATH, str(plot_data['nodes']) + 'nodes.png'))
+        # fig.figimage(img, SUBPLOT_IMAGE_POSX, SUBPLOT_IMAGE_POSY + SUBPLOT_IMAGE_POSY_MULT*(7 - plot_data['nodes']))
         ax.grid()
         plt.show(block = False)
 
@@ -393,7 +395,7 @@ def plot_bytes_per_hop(data_structure, user_req, average):
             ax.plot(x_labels, y_values, marker = '.', color = colors[cnt], label = LABEL_DICT[type_key])
             ax.plot(x_labels, y_values, color = colors[cnt])
             ax.set_xticks(x_labels)
-            if(average):
+            if(not average):
                 ax.set_ylabel('Total bytes of telemetry appended')
             else:
                 ax.set_ylabel('Bytes of telemetry appended per minute (average)')
@@ -401,8 +403,8 @@ def plot_bytes_per_hop(data_structure, user_req, average):
             ax.legend()
             cnt += 1 
         
-        img = plt.imread(os.path.join(DIAGRAMS_PATH, str(plot_data['nodes']) + 'nodes.png'))
-        fig.figimage(img, SUBPLOT_IMAGE_POSX, SUBPLOT_IMAGE_POSY + SUBPLOT_IMAGE_POSY_MULT*(7 - plot_data['nodes']))
+        # img = plt.imread(os.path.join(DIAGRAMS_PATH, str(plot_data['nodes']) + 'nodes.png'))
+        # fig.figimage(img, SUBPLOT_IMAGE_POSX, SUBPLOT_IMAGE_POSY + SUBPLOT_IMAGE_POSY_MULT*(7 - plot_data['nodes']))
         ax.grid()
         plt.axhspan(0, user_req, color="red", alpha=0.15, lw=0)
         plt.show(block = False)
@@ -600,7 +602,7 @@ def plot_tx_rx_hop(data_structure, total):
             plt.show(block = False)
 
 def main():
-    FOLDER_PATH = os.path.join(SELF_PATH, "datafiles_v5")
+    FOLDER_PATH = os.path.join(SELF_PATH, "datafiles_v5_circular_special")
     file_cnt = 0
     data = {}
     for filename in os.listdir(FOLDER_PATH):
@@ -611,12 +613,12 @@ def main():
     # plot_energy_per_hop(data)
     # plot_energy_vs_hops_legend_bytes_types_windows(data)  
     # plot_energy_vs_nodes_legend_type_bytes_windows(data)
-    # plot_bytes_per_hop(data, 0, False)
-    # plot_average_energy_per_byte_vs_hops(data)
+    # plot_bytes_per_hop(data, 70, True)
+    plot_average_energy_per_byte_vs_hops(data)
     # plot_byte_cost_vs_nodes_legend_type_bytes_windows(data)
     # plot_insertion_ratio(data)
-    plot_tx_rx_hop(data, False)
-    plot_tx_rx_hop(data, True)
+    # plot_tx_rx_hop(data, False)
+    # plot_tx_rx_hop(data, True)
 
     plt.show()
 
